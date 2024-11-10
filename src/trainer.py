@@ -67,11 +67,11 @@ class Trainer:
         positive_distance = (face1_outputs - face2_outputs) ** 2
         negative_distance = (face1_outputs - stranger_outputs) ** 2
 
-        loss = (margin + positive_distance - negative_distance).mean()
+        loss = torch.max((margin + positive_distance - negative_distance).mean(), torch.tensor(0))
 
         return loss
     
-    def validation_step(self, val_loader: DataLoader, margin: int = 0) -> float:
+    def validation_step(self, val_loader: DataLoader, margin: float = 0.0) -> float:
         val_loss = []
         with torch.no_grad():
             for i, data in enumerate(val_loader):
@@ -109,7 +109,7 @@ class Trainer:
                 progress_bar.update()
                 tqdm._instances.clear()
 
-            val_loss = self.validation_step(val_loader)
+            val_loss = self.validation_step(val_loader, margin=margin)
             train_losses = sum(train_losses) / len(train_losses)
             progress_bar.set_postfix({"val/loss": val_loss})
             progress_bar.update()
