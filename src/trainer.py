@@ -4,10 +4,11 @@ from torch.utils.data import Dataset, DataLoader
 import os
 
 class Trainer:
-    def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32):
+    def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32, save_ckpt=False):
         self.ckpt_path = ckpt_path
         self.device = device
         self.dtype = dtype
+        self.save_ckpt = save_ckpt
 
     def config_trainer(self, model, optimizer, wandb_logger):
         self.model = model
@@ -106,15 +107,18 @@ class Trainer:
 
                 progress_bar.set_postfix({"train/loss": train_losses[-1]})
                 progress_bar.update()
+                tqdm._instances.clear()
 
             val_loss = self.validation_step(val_loader)
             train_losses = sum(train_losses) / len(train_losses)
             progress_bar.set_postfix({"val/loss": val_loss})
             progress_bar.update()
+            tqdm._instances.clear()
 
             self._train_loss = train_losses
             self._val_loss = val_loss
 
             self.wandb_logger.log({"train/loss": train_losses, "val/loss": val_loss})
 
-            self.save_model()
+            if self.save_ckpt:
+                self.save_model()
