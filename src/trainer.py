@@ -4,8 +4,10 @@ from torch.utils.data import Dataset, DataLoader
 import os
 
 class Trainer:
-    def __init__(self, ckpt_path="checkpoints/"):
+    def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32):
         self.ckpt_path = ckpt_path
+        self.device = device
+        self.dtype = dtype
 
     def config_trainer(self, model, optimizer, wandb_logger):
         self.model = model
@@ -99,7 +101,6 @@ class Trainer:
 
                 loss.backward()
                 self.optimizer.step()
-                print(loss)
 
                 train_losses.append(loss.detach().cpu())
 
