@@ -1,0 +1,7 @@
+wandb/
+dataset/
+checkpoints/
+face-search/
+
+*.pyc
+.DS_Store
