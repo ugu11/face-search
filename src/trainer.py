@@ -9,6 +9,7 @@ class Trainer:
         self.device = device
         self.dtype = dtype
         self.save_ckpt = save_ckpt
+        self.current_epoch = 0
 
     def config_trainer(self, model, optimizer, wandb_logger):
         self.model = model
@@ -46,11 +47,11 @@ class Trainer:
 
         self.model.load_state_dict(checkpoint["vit_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        self.epoch = checkpoint["epoch"]
+        self.current_epoch = checkpoint["epoch"]
         self._train_loss = checkpoint["train/loss"]
         self._val_loss = checkpoint["val/loss"]
 
-        print("Loaded: ", self.epoch, self._train_loss, self._val_loss)
+        print("Loaded: ", self.current_epoch, self._train_loss, self._val_loss)
 
 
     def shared_step(self, batch, margin: float = 0.0) -> float:
@@ -64,10 +65,13 @@ class Trainer:
         face2_outputs = self.model(face2)
         stranger_outputs = self.model(stranger)
 
-        positive_distance = (face1_outputs - face2_outputs) ** 2
-        negative_distance = (face1_outputs - stranger_outputs) ** 2
+        positive_distance = ((face1_outputs - face2_outputs) ** 2).mean(1)
+        negative_distance = ((face1_outputs - stranger_outputs) ** 2).mean(1)
+        negative_distance_swap = ((face2_outputs - stranger_outputs) ** 2).mean(1)
+        hard_negative_distance = torch.min(negative_distance, negative_distance_swap)
 
-        loss = torch.max((margin + positive_distance - negative_distance).mean(), torch.tensor(0))
+
+        loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0))
 
         return loss
     
@@ -88,7 +92,7 @@ class Trainer:
             epochs: int = 100,
             margin: float = 0.0
         ):
-        for e in range(epochs):
+        for e in range(self.current_epoch, epochs):
             self.current_epoch = e
             progress_bar = tqdm(total=len(train_loader))
             progress_bar.set_description(f"Epoch {e}")
