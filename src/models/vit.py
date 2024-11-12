@@ -47,7 +47,9 @@ class MLP(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(dim, dim*4),
             nn.GELU(),
+            nn.Dropout(dropout)
             nn.Linear(dim*4, dim),
+            nn.Dropout(dropout)
         )
 
     def forward(self, x):
@@ -122,6 +124,7 @@ class ViT(nn.Module):
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
         x = torch.cat([self.cls_token.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
         x = x + self.positional_embedding.to(x.dtype)
+        x = self.dropout(x)
         x = self.ln_pre(x)
         
         x = x.permute(1, 0, 2)  # NLD -> LND
