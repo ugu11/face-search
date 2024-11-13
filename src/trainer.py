@@ -84,9 +84,9 @@ class Trainer:
         face2_outputs = self.model(face2)
         stranger_outputs = self.model(stranger)
 
-        positive_distance = self.distance(face1_outputs, face2_outputs)
-        negative_distance = self.distance(face1_outputs, stranger_outputs)
-        negative_distance_swap = self.distance(face2_outputs, stranger_outputs)
+        positive_distance = self.calc_distance(face1_outputs, face2_outputs)
+        negative_distance = self.calc_distance(face1_outputs, stranger_outputs)
+        negative_distance_swap = self.calc_distance(face2_outputs, stranger_outputs)
         hard_negative_distance = torch.min(negative_distance, negative_distance_swap)
 
         loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0))
