@@ -39,7 +39,7 @@ class Trainer:
     def cosine_similarity(self, x, y, eps=1e-8):
         # x = x / x.norm(dim=1, keepdim=True)
         # y = y / y.norm(dim=1, keepdim=True)
-        x_norm = torch.max(x.norm(dim=1, keepdim=True), torch.ones(x.shap, device=self.device, dtype=self.dtype) * eps)
+        x_norm = torch.max(x.norm(dim=1, keepdim=True), torch.ones(x.shape, device=self.device, dtype=self.dtype) * eps)
         y_norm = torch.max(y.norm(dim=1, keepdim=True), torch.ones(y.shape, device=self.device, dtype=self.dtype) * eps)
         
         similarity = (x @ y.t()) / (x_norm @ y_norm.t())
@@ -92,8 +92,6 @@ class Trainer:
         negative_distance = self.calc_distance(face1_outputs, stranger_outputs)
         negative_distance_swap = self.calc_distance(face2_outputs, stranger_outputs)
         hard_negative_distance = torch.min(negative_distance, negative_distance_swap)
-
-        print(positive_distance.min(), negative_distance.min(), negative_distance_swap.min())
 
         loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0))
 
