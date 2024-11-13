@@ -39,8 +39,10 @@ class Trainer:
     def cosine_similarity(self, x, y, eps=1e-8):
         # x = x / x.norm(dim=1, keepdim=True)
         # y = y / y.norm(dim=1, keepdim=True)
+        x_norm = torch.max(x.norm(dim=1, keepdim=True), torch.ones(x.shap, device=self.device, dtype=self.dtype) * eps)
+        y_norm = torch.max(y.norm(dim=1, keepdim=True), torch.ones(y.shape, device=self.device, dtype=self.dtype) * eps)
         
-        similarity = (x @ y.t()) / (torch.max(x.norm(dim=1, keepdim=True), torch.ones(x.shape) * eps) @  torch.max(y.norm(dim=1, keepdim=True), torch.ones(y.shape) * eps).t())
+        similarity = (x @ y.t()) / (x_norm @ y_norm.t())
 
         return 1 - similarity
 
