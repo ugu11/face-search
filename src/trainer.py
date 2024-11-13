@@ -91,7 +91,7 @@ class Trainer:
 
         loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0))
 
-        return loss, positive_distance, hard_negative_distance
+        return loss, positive_distance.mean(), hard_negative_distance.mean()
     
     def validation_step(self, val_loader: DataLoader, margin: float = 0.0) -> float:
         val_loss = []
