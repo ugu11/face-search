@@ -2,14 +2,18 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset, DataLoader
 import os
+import numpy as np
 
 class Trainer:
-    def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32, save_ckpt=False):
+    def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32, save_ckpt=False, distance="mse"):
         self.ckpt_path = ckpt_path
         self.device = device
         self.dtype = dtype
         self.save_ckpt = save_ckpt
         self.current_epoch = 0
+        self.distance = distance
+
+        self.logit_scale = torch.ones([]) * np.log(1 / 0.07)
 
     def config_trainer(self, model, optimizer, wandb_logger):
         self.model = model
@@ -29,6 +33,21 @@ class Trainer:
         for filename in checkpoints_files_list[1:]:
             os.remove(os.path.join(self.ckpt_path, "checkpoints", filename))
 
+    def mse_distance(self, x, y):
+        return ((x - y) ** 2).mean(1)
+    
+    def cosine_similarity(self, x, y):
+        x = x / x.norm(dim=1, keepdim=True)
+        y = y / y.norm(dim=1, keepdim=True)
+        
+        return self.logit_scale.exp() * x @ y.t()
+
+    def distance(self, x, y):
+        if self.distance == "cosine_similarity":
+            return self.cosine_similarity(x, y)
+        else:
+            return self.mse_distance(x, y)
+
 
     def save_model(self,):
         self._delete_older_checkpoints()
@@ -39,7 +58,7 @@ class Trainer:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'train/loss': self._train_loss,
             'val/loss': self._val_loss,
-        }, os.path.join(self.ckpt_path, "checkpoints", f"epoch={self.current_epoch}-vloss{'{:.2f}'.format(self._val_loss)}.ckpt"))
+        }, os.path.join(self.ckpt_path, f"epoch={self.current_epoch}-vloss{'{:.2f}'.format(self._val_loss)}.ckpt"))
 
 
     def load_model(self, path: str):
@@ -65,26 +84,31 @@ class Trainer:
         face2_outputs = self.model(face2)
         stranger_outputs = self.model(stranger)
 
-        positive_distance = ((face1_outputs - face2_outputs) ** 2).mean(1)
-        negative_distance = ((face1_outputs - stranger_outputs) ** 2).mean(1)
-        negative_distance_swap = ((face2_outputs - stranger_outputs) ** 2).mean(1)
+        positive_distance = self.distance(face1_outputs, face2_outputs)
+        negative_distance = self.distance(face1_outputs, stranger_outputs)
+        negative_distance_swap = self.distance(face2_outputs, stranger_outputs)
         hard_negative_distance = torch.min(negative_distance, negative_distance_swap)
-
 
         loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0))
 
-        return loss
+        return loss, positive_distance, hard_negative_distance
     
     def validation_step(self, val_loader: DataLoader, margin: float = 0.0) -> float:
         val_loss = []
+        positive_distances = []
+        negative_distances = []
         with torch.no_grad():
-            for i, data in enumerate(val_loader):
-                loss = self.shared_step(data, margin)
+            for _, data in enumerate(val_loader):
+                loss, positive_distance, negative_distance = self.shared_step(data, margin)
                 val_loss.append(loss.detach().cpu())
+                positive_distances.append(positive_distance.detach().cpu())
+                negative_distances.append(negative_distance.detach().cpu())
 
         val_loss = sum(val_loss) / len(val_loss)
+        positive_distance = sum(positive_distance) / len(positive_distance)
+        negative_distances = sum(negative_distances) / len(negative_distances)
 
-        return val_loss
+        return val_loss, positive_distance, negative_distances
 
     def fit(self,
             train_loader: DataLoader,
@@ -97,32 +121,52 @@ class Trainer:
             progress_bar = tqdm(total=len(train_loader))
             progress_bar.set_description(f"Epoch {e}")
             train_losses = []
+            positive_distances = []
+            negative_distances = []
             self.wandb_logger.log({"epoch": e})
 
             for i, data in enumerate(train_loader):
                 self.optimizer.zero_grad()
                 
-                loss = self.shared_step(data, margin=margin)
+                loss, positive_distance, negative_distance = self.shared_step(data, margin=margin)
 
                 loss.backward()
                 self.optimizer.step()
 
                 train_losses.append(loss.detach().cpu())
+                positive_distances.append(positive_distance.detach().cpu())
+                negative_distances.append(negative_distance.detach().cpu())
 
-                progress_bar.set_postfix({"train/loss": train_losses[-1]})
+                progress_bar.set_postfix({
+                    "train/loss": train_losses[-1],
+                    "train/positive_distance": positive_distances[-1],
+                    "train/negative_distance": negative_distances[-1],
+                })
                 progress_bar.update()
                 tqdm._instances.clear()
 
-            val_loss = self.validation_step(val_loader, margin=margin)
+            val_loss, val_positive_distance, val_negative_distance = self.validation_step(val_loader, margin=margin)
             train_losses = sum(train_losses) / len(train_losses)
-            progress_bar.set_postfix({"val/loss": val_loss})
+            positive_distances = sum(positive_distances) / len(positive_distances)
+            negative_distances = sum(negative_distances) / len(negative_distances)
+
+            logging_data = {
+                "train/loss": train_losses,
+                "train/positive_distance": positive_distances,
+                "train/negative_distance": negative_distances,
+                "val/loss": val_loss,
+                "val/positive_distance": val_positive_distance,
+                "val/negative_distance": val_negative_distance,
+            }
+
+            progress_bar.set_postfix(logging_data)
             progress_bar.update()
             tqdm._instances.clear()
 
             self._train_loss = train_losses
             self._val_loss = val_loss
 
-            self.wandb_logger.log({"train/loss": train_losses, "val/loss": val_loss})
+            self.wandb_logger.log(logging_data)
 
             if self.save_ckpt:
                 self.save_model()
