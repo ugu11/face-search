@@ -105,10 +105,10 @@ class Trainer:
                 negative_distances.append(negative_distance.detach().cpu())
 
         val_loss = sum(val_loss) / len(val_loss)
-        positive_distance = sum(positive_distance) / len(positive_distance)
+        positive_distances = sum(positive_distances) / len(positive_distances)
         negative_distances = sum(negative_distances) / len(negative_distances)
 
-        return val_loss, positive_distance, negative_distances
+        return val_loss, positive_distances, negative_distances
 
     def fit(self,
             train_loader: DataLoader,
