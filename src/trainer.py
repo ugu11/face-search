@@ -42,7 +42,7 @@ class Trainer:
         
         return self.logit_scale.exp() * x @ y.t()
 
-    def distance(self, x, y):
+    def calc_distance(self, x, y):
         if self.distance == "cosine_similarity":
             return self.cosine_similarity(x, y)
         else:
