@@ -28,38 +28,26 @@ def load_train_val_datasets(dataset: dict):
 
 def run_demo_train():
 
-    trainer = Trainer()
+    trainer = Trainer(device="cpu", distance="cosine_similarity")
     LR = 1e-4
     EPOCHS = 3
     BATCH_SIZE = 4
 
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project = "face-recognition",
-        # track hyperparameters and run metadata
-        config = {
-            "learning_rate": LR,
-            "epochs": EPOCHS,
-            "batch-size": BATCH_SIZE,
-            "loss": "triplet loss",
-        },
-        name = "triplet-loss-v1"
-    )
     
     vit = ViT(
-        transformer_depth=12,
-        attn_heads=12,
+        transformer_depth=2,
+        attn_heads=2,
         mlp_dim=768,
-        output_dim=512,
+        output_dim=16,
         patch_width = 16,
         patch_height = 16,
         image_width = 128,
         image_height = 128,
-        patch_embeddings_dim = 768
+        patch_embeddings_dim = 128
     )
 
     optimizer = AdamW(vit.parameters(), lr=LR)
-    trainer.config_trainer(vit, optimizer, wandb_logger=wandb)
+    trainer.config_trainer(vit, optimizer, wandb_logger=None)
 
     with open("dataset/face_dataset.json", 'r') as f:
         dataset_dict = json.load(f)

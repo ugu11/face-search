@@ -36,11 +36,13 @@ class Trainer:
     def mse_distance(self, x, y):
         return ((x - y) ** 2).mean(1)
     
-    def cosine_similarity(self, x, y):
-        x = x / x.norm(dim=1, keepdim=True)
-        y = y / y.norm(dim=1, keepdim=True)
+    def cosine_similarity(self, x, y, eps=1e-8):
+        # x = x / x.norm(dim=1, keepdim=True)
+        # y = y / y.norm(dim=1, keepdim=True)
         
-        return self.logit_scale.exp() * x @ y.t()
+        similarity = (x @ y.t()) / (torch.max(x.norm(dim=1, keepdim=True), torch.ones(x.shape) * eps) @  torch.max(y.norm(dim=1, keepdim=True), torch.ones(y.shape) * eps).t())
+
+        return 1 - similarity
 
     def calc_distance(self, x, y):
         if self.distance == "cosine_similarity":
@@ -89,6 +91,8 @@ class Trainer:
         negative_distance_swap = self.calc_distance(face2_outputs, stranger_outputs)
         hard_negative_distance = torch.min(negative_distance, negative_distance_swap)
 
+        print(positive_distance.min(), negative_distance.min(), negative_distance_swap.min())
+
         loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0))
 
         return loss, positive_distance.mean(), hard_negative_distance.mean()
@@ -123,7 +127,8 @@ class Trainer:
             train_losses = []
             positive_distances = []
             negative_distances = []
-            self.wandb_logger.log({"epoch": e})
+            if self.wandb_logger != None:
+                self.wandb_logger.log({"epoch": e})
 
             for i, data in enumerate(train_loader):
                 self.optimizer.zero_grad()
@@ -166,7 +171,8 @@ class Trainer:
             self._train_loss = train_losses
             self._val_loss = val_loss
 
-            self.wandb_logger.log(logging_data)
+            if self.wandb_logger != None:
+                self.wandb_logger.log(logging_data)
 
             if self.save_ckpt:
                 self.save_model()
