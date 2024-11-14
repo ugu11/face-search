@@ -5,13 +5,14 @@ import os
 import numpy as np
 
 class Trainer:
-    def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32, save_ckpt=False, distance="mse"):
+    def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32, save_ckpt=False, distance="mse", positive_weight=0.3):
         self.ckpt_path = ckpt_path
         self.device = device
         self.dtype = dtype
         self.save_ckpt = save_ckpt
         self.current_epoch = 0
         self.distance = distance
+        self.positive_weight = positive_weight
 
         self.logit_scale = torch.ones([]) * np.log(1 / 0.07)
 
@@ -93,7 +94,7 @@ class Trainer:
         negative_distance_swap = self.calc_distance(face2_outputs, stranger_outputs)
         hard_negative_distance = torch.min(negative_distance, negative_distance_swap)
 
-        loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0))
+        loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0)) + self.positive_weight * positive_distance.mean()
 
         return loss, positive_distance.mean(), hard_negative_distance.mean()
     
