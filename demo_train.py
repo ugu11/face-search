@@ -32,7 +32,6 @@ def run_demo_train():
     LR = 1e-4
     EPOCHS = 3
     BATCH_SIZE = 4
-
     
     vit = ViT(
         transformer_depth=2,

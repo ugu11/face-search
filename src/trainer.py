@@ -4,7 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 import os
 import numpy as np
 
-from src.models.loss.triplet_loss import TripletLoss
+from .models.loss.triplet_loss import TripletLoss
 
 class Trainer:
     def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32, save_ckpt=False, distance="mse", positive_weight=0.3):
@@ -14,9 +14,6 @@ class Trainer:
         self.save_ckpt = save_ckpt
         self.current_epoch = 0
         self.distance = distance
-        self.positive_weight = positive_weight
-
-        self.logit_scale = torch.ones([]) * np.log(1 / 0.07)
 
     def config_trainer(self, model, optimizer, wandb_logger=None, loss="triplet_loss"):
         self.model = model
@@ -24,7 +21,7 @@ class Trainer:
         self.wandb_logger = wandb_logger
 
         if loss == "triplet_loss":
-            self.loss_fn = TripletLoss()
+            self.loss_fn = TripletLoss(distance=self.distance)
 
     def _delete_older_checkpoints(self):
         checkpoints_dir = os.path.join(self.ckpt_path, "checkpoints")
