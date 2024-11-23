@@ -43,7 +43,7 @@ def run_demo_train():
         patch_height = 16,
         image_width = 128,
         image_height = 128,
-        patch_embeddings_dim = 128
+        patch_embeddings_dim = 64
     )
 
     optimizer = AdamW(vit.parameters(), lr=LR)

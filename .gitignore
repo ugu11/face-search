@@ -5,3 +5,6 @@ face-search/
 
 *.pyc
 .DS_Store
+
+*.jpg
+*.ipynb

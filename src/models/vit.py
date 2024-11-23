@@ -133,6 +133,8 @@ class ViT(nn.Module):
         
         x = self.ln_post(x[:, 0, :])
 
+        x = x @ self.out_proj
+
         return x
 
     def forward(self, x):

@@ -4,6 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 import os
 import numpy as np
 
+from src.models.loss.triplet_loss import TripletLoss
+
 class Trainer:
     def __init__(self, ckpt_path="checkpoints/", device="cuda", dtype=torch.float32, save_ckpt=False, distance="mse", positive_weight=0.3):
         self.ckpt_path = ckpt_path
@@ -16,10 +18,13 @@ class Trainer:
 
         self.logit_scale = torch.ones([]) * np.log(1 / 0.07)
 
-    def config_trainer(self, model, optimizer, wandb_logger):
+    def config_trainer(self, model, optimizer, wandb_logger=None, loss="triplet_loss"):
         self.model = model
         self.optimizer = optimizer
         self.wandb_logger = wandb_logger
+
+        if loss == "triplet_loss":
+            self.loss_fn = TripletLoss()
 
     def _delete_older_checkpoints(self):
         checkpoints_dir = os.path.join(self.ckpt_path, "checkpoints")
@@ -78,25 +83,16 @@ class Trainer:
         print("Loaded: ", self.current_epoch, self._train_loss, self._val_loss)
 
 
-    def shared_step(self, batch, margin: float = 0.0) -> float:
+    def shared_step(self, batch, margin: float = 1.0) -> float:
         face1, face2, stranger = batch["face1"], batch["face2"], batch["stranger"]
         
         face1 = face1.to(device=self.device, dtype=self.dtype)
         face2 = face2.to(device=self.device, dtype=self.dtype)
         stranger = stranger.to(device=self.device, dtype=self.dtype)
 
-        face1_outputs = self.model(face1)
-        face2_outputs = self.model(face2)
-        stranger_outputs = self.model(stranger)
+        loss, positive_distance, negative_distance = self.loss_fn(margin, face1, face2, stranger, self.model)
 
-        positive_distance = self.calc_distance(face1_outputs, face2_outputs)
-        negative_distance = self.calc_distance(face1_outputs, stranger_outputs)
-        negative_distance_swap = self.calc_distance(face2_outputs, stranger_outputs)
-        hard_negative_distance = torch.min(negative_distance, negative_distance_swap)
-
-        loss = torch.max((margin + positive_distance - hard_negative_distance).mean(), torch.tensor(0)) + self.positive_weight * positive_distance.mean()
-
-        return loss, positive_distance.mean(), hard_negative_distance.mean()
+        return loss, positive_distance, negative_distance
     
     def validation_step(self, val_loader: DataLoader, margin: float = 0.0) -> float:
         val_loss = []
