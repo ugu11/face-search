@@ -15,13 +15,12 @@ class Trainer:
         self.current_epoch = 0
         self.distance = distance
 
-    def config_trainer(self, model, optimizer, wandb_logger=None, loss="triplet_loss"):
+    def config_trainer(self, model, optimizer, loss_fn, wandb_logger=None):
         self.model = model
         self.optimizer = optimizer
         self.wandb_logger = wandb_logger
 
-        if loss == "triplet_loss":
-            self.loss_fn = TripletLoss(distance=self.distance)
+        self.loss_fn = loss_fn
 
     def _delete_older_checkpoints(self):
         checkpoints_dir = os.path.join(self.ckpt_path, "checkpoints")
@@ -87,7 +86,13 @@ class Trainer:
         face2 = face2.to(device=self.device, dtype=self.dtype)
         stranger = stranger.to(device=self.device, dtype=self.dtype)
 
-        loss, positive_distance, negative_distance = self.loss_fn(margin, face1, face2, stranger, self.model)
+        anchor_outputs = self.model(face1)
+        positive_outputs = self.model(face2)
+        negative_outputs = self.model(stranger)
+
+        loss = self.loss_fn(margin, anchor_outputs, positive_outputs, negative_outputs)
+        positive_distance = torch.abs((anchor_outputs - positive_outputs)).mean(1)
+        negative_distance = torch.abs((anchor_outputs - negative_outputs)).mean(1)
 
         return loss, positive_distance, negative_distance
     
