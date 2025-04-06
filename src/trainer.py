@@ -91,8 +91,8 @@ class Trainer:
         negative_outputs = self.model(stranger)
 
         loss = self.loss_fn(margin, anchor_outputs, positive_outputs, negative_outputs)
-        positive_distance = torch.abs((anchor_outputs - positive_outputs)).mean(1)
-        negative_distance = torch.abs((anchor_outputs - negative_outputs)).mean(1)
+        positive_distance = torch.abs((anchor_outputs - positive_outputs)).mean(1).mean()
+        negative_distance = torch.abs((anchor_outputs - negative_outputs)).mean(1).mean()
 
         return loss, positive_distance, negative_distance
     
