@@ -15,12 +15,13 @@ class Trainer:
         self.current_epoch = 0
         self.distance = distance
 
-    def config_trainer(self, model, optimizer, loss_fn, wandb_logger=None):
+    def config_trainer(self, model, optimizer, loss_fn, loss_type="tuple", wandb_logger=None):
         self.model = model
         self.optimizer = optimizer
         self.wandb_logger = wandb_logger
 
         self.loss_fn = loss_fn
+        self.loss_type = loss_type
 
     def _delete_older_checkpoints(self):
         checkpoints_dir = os.path.join(self.ckpt_path, "checkpoints")
@@ -78,8 +79,7 @@ class Trainer:
 
         print("Loaded: ", self.current_epoch, self._train_loss, self._val_loss)
 
-
-    def shared_step(self, batch, margin: float = 1.0) -> float:
+    def triplet_loss_step(self, batch, margin: float = 1.0):
         face1, face2, stranger = batch["face1"], batch["face2"], batch["stranger"]
         
         face1 = face1.to(device=self.device, dtype=self.dtype)
@@ -94,7 +94,24 @@ class Trainer:
         positive_distance = torch.abs((anchor_outputs - positive_outputs)).mean(1).mean()
         negative_distance = torch.abs((anchor_outputs - negative_outputs)).mean(1).mean()
 
-        return loss, positive_distance, negative_distance
+    def tuple_loss_step(self, batch, margin: float = 1.0):
+        face1, face2, similarity = batch["face1"], batch["face2"], batch["similarity"]
+        
+        face1 = face1.to(device=self.device, dtype=self.dtype)
+        face2 = face2.to(device=self.device, dtype=self.dtype)
+
+        anchor_outputs = self.model(face1)
+        positive_outputs = self.model(face2)
+
+        loss, pos_similarity, neg_similarity = self.loss_fn(anchor_outputs, positive_outputs, similarity, margin)
+
+        return loss, pos_similarity, neg_similarity
+
+    def shared_step(self, batch, margin: float = 1.0) -> float:
+        if self.loss_type == "triple":
+            return self.triplet_loss_step(batch, margin)
+        elif self.loss_type == "tuple":
+            return self.tuple_loss_step(batch, margin)
     
     def validation_step(self, val_loader: DataLoader, margin: float = 0.0) -> float:
         val_loss = []
